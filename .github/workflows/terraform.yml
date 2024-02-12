@@ -30,6 +30,10 @@ jobs:
 
       - name: Terraform Validate
         id: validate
+        env:
+          credentials_file_path: ${{secrets.TF_VAR_CREDENTIALS_FILE_PATH}}
+          region: ${{secrets.TF_VAR_REGION}}
+          project_id: ${{secrets.TF_VAR_PROJECT_ID}}
         run: terraform validate -no-color
 
       - name: Terraform Plan
