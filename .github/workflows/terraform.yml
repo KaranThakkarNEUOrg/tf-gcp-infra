@@ -27,3 +27,7 @@ jobs:
       - name: Terraform Init
         id: init
         run: terraform init
+
+      - name: Terraform Validate
+        id: validate
+        run: terraform validate -var 'project_id=${{ secrets.TF_VAR_PROJECT_ID }}' -var 'region=${{ secrets.TF_VAR_REGION }}' -var 'credentials_file_path=${{ secrets.TF_VAR_CREDENTIALS_FILE_PATH }}'
