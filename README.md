@@ -1,4 +1,4 @@
-# Terraform setup commands
+# Terraform setup commands(reference[https://developer.hashicorp.com/terraform/install])
 
 ```
 terraform init
@@ -12,4 +12,10 @@ terraform destroy
 
 ```
 terraform apply -var 'project_id=YOUR_PROJECT_ID' -var 'region=YOUR_REGION' -var 'credentials_file_path=PATH_TO_YOUR_CREDENTIALS_FILE'
+```
+
+# Gcloud auth login
+
+```
+gcloud auth application-default login
 ```
