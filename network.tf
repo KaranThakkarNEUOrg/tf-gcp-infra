@@ -13,7 +13,7 @@ resource "google_compute_subnetwork" "webapp" {
 }
 
 resource "google_compute_subnetwork" "db" {
-  name          = var.subnet2_name
+       name          = var.subnet2_name
   ip_cidr_range = var.subnet2_ip_address
   network       = google_compute_network.vpc.self_link
   region        = var.region
