@@ -26,3 +26,31 @@ resource "google_compute_route" "webapp_route" {
   next_hop_gateway = "default-internet-gateway"
   tags             = [var.subnet1_name]
 }
+
+resource "google_compute_firewall" "firewall" {
+  name    = "allow-traffic"
+  network = google_compute_network.vpc.name
+  allow {
+    protocol = "tcp"
+    ports    = [80, 8080, 22]
+  }
+  source_ranges = ["0.0.0.0/0"]
+}
+
+resource "google_compute_instance" "vm_instance" {
+  name         = "terraform-instance"
+  machine_type = "e2-medium"
+  zone         = "us-east1-b"
+  boot_disk {
+    initialize_params {
+      image = "csye-centos-8"
+      size  = "100"
+      type  = "pd-balanced"
+    }
+  }
+
+  network_interface {
+    network    = google_compute_network.vpc.name
+    subnetwork = google_compute_subnetwork.webapp.name
+  }
+}
