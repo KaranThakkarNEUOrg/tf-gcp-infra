@@ -39,3 +39,22 @@ variable "route_name" {
   description = "Name of the route"
 }
 
+variable "vm_instance_name" {
+
+}
+
+variable "machine_type" {
+
+}
+variable "vm_instance_zone" {
+
+}
+variable "image_name" {
+
+}
+variable "instance_size" {
+
+}
+variable "instance_type" {
+
+}
