@@ -27,30 +27,45 @@ resource "google_compute_route" "webapp_route" {
   tags             = [var.subnet1_name]
 }
 
-resource "google_compute_firewall" "firewall" {
-  name    = "allow-traffic"
+resource "google_compute_firewall" "firewall_allow_rules" {
+  name    = "firewall-allow-rules"
   network = google_compute_network.vpc.name
   allow {
     protocol = "tcp"
-    ports    = [80, 8080, 22]
+    ports    = [80, 8888]
   }
+
+  source_ranges = ["0.0.0.0/0"]
+}
+
+resource "google_compute_firewall" "firewall_deny_rules" {
+  name    = "firewall-deny-rules"
+  network = google_compute_network.vpc.name
+  deny {
+    protocol = "tcp"
+    ports    = [22]
+  }
+
   source_ranges = ["0.0.0.0/0"]
 }
 
 resource "google_compute_instance" "vm_instance" {
-  name         = "terraform-instance"
-  machine_type = "e2-medium"
-  zone         = "us-east1-b"
+  name         = var.vm_instance_name
+  machine_type = var.machine_type
+  zone         = var.vm_instance_zone
   boot_disk {
     initialize_params {
-      image = "csye-centos-8"
-      size  = "100"
-      type  = "pd-balanced"
+      image = var.image_name
+      size  = var.instance_size
+      type  = var.instance_type
     }
   }
 
   network_interface {
     network    = google_compute_network.vpc.name
     subnetwork = google_compute_subnetwork.webapp.name
+    access_config {
+    }
   }
+
 }
