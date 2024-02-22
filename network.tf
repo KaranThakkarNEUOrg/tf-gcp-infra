@@ -29,13 +29,14 @@ resource "google_compute_route" "webapp_route" {
 
 resource "google_compute_firewall" "firewall_allow_rules" {
   name    = "firewall-allow-rules"
-  network = google_compute_network.vpc.name
+  network = google_compute_network.vpc.self_link
   allow {
     protocol = "tcp"
-    ports    = [80, 8888]
+    ports    = ["8080"]
   }
 
   source_ranges = ["0.0.0.0/0"]
+  target_tags   = [var.subnet1_name, "http-server"]
 }
 
 resource "google_compute_firewall" "firewall_deny_rules" {
@@ -43,16 +44,19 @@ resource "google_compute_firewall" "firewall_deny_rules" {
   network = google_compute_network.vpc.name
   deny {
     protocol = "tcp"
-    ports    = [22]
+    ports    = ["22"]
   }
 
   source_ranges = ["0.0.0.0/0"]
+  target_tags   = [var.subnet1_name, "http-server"]
 }
 
-resource "google_compute_instance" "vm_instance" {
+
+resource "google_compute_instance" "default" {
   name         = var.vm_instance_name
   machine_type = var.machine_type
   zone         = var.vm_instance_zone
+  tags         = [var.subnet1_name, "http-server"]
   boot_disk {
     initialize_params {
       image = var.image_name
@@ -62,8 +66,8 @@ resource "google_compute_instance" "vm_instance" {
   }
 
   network_interface {
-    network    = google_compute_network.vpc.name
-    subnetwork = google_compute_subnetwork.webapp.name
+    network    = google_compute_network.vpc.self_link
+    subnetwork = google_compute_subnetwork.webapp.self_link
     access_config {
     }
   }

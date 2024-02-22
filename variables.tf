@@ -58,3 +58,6 @@ variable "instance_size" {
 variable "instance_type" {
 
 }
+variable "firewall_network" {
+
+}
