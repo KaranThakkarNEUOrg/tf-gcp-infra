@@ -1,63 +1,35 @@
-variable "project_id" {
-  description = "Project ID where resources will be created"
-}
-
-
-variable "region" {
-  description = "The region where resources will be created"
-}
-
-variable "credentials_file_path" {
-  description = "Path to the credentials file"
-}
-
-variable "vpc_name" {
-  description = "Name of the VPC"
-}
-
-variable "subnet1_name" {
-  description = "Name of the subnet1"
-}
-
-variable "subnet2_name" {
-  description = "Name of the subnet2"
-}
-
-variable "routing_mode" {
-  description = "Routing mode for the VPC"
-}
-
-variable "subnet1_ip_address" {
-  description = "IP address range for subnet1"
-}
-
-variable "subnet2_ip_address" {
-  description = "IP address range for subnet2"
-}
-
-variable "route_name" {
-  description = "Name of the route"
-}
-
-variable "vm_instance_name" {
-
-}
-
-variable "machine_type" {
-
-}
-variable "vm_instance_zone" {
-
-}
-variable "image_name" {
-
-}
-variable "instance_size" {
-
-}
-variable "instance_type" {
-
-}
-variable "firewall_network" {
-
-}
+variable "project_id" {}
+variable "region" {}
+variable "credentials_file_path" {}
+variable "vpc_name" {}
+variable "subnet1_name" {}
+variable "subnet2_name" {}
+variable "routing_mode" {}
+variable "subnet1_ip_address" {}
+variable "subnet2_ip_address" {}
+variable "route_name" {}
+variable "vm_instance_name" {}
+variable "machine_type" {}
+variable "vm_instance_zone" {}
+variable "image_name" {}
+variable "instance_size" {}
+variable "instance_type" {}
+variable "firewall_network" {}
+variable "database_port" {}
+variable "salt_rounds" {}
+variable "sql_database_instance_name" {}
+variable "sql_db_instance_region" {}
+variable "sql_db_instance_disk_type" {}
+variable "sql_db_instance_tier" {}
+variable "sql_db_name" {}
+variable "sql_user_name" {}
+variable "sql_db_instance_availability_type" {}
+variable "compute_global_address_prefix_length" {}
+variable "compute_global_address_name" {}
+variable "firewall_allow_ports" {}
+variable "firewall_deny_ports" {}
+variable "source_ranges" {}
+variable "gcga_purpose" {}
+variable "gcga_address_type" {}
+variable "sql_instance_disk_size" {}
+variable "sql_instance_deletion_protection_enabled" {}
