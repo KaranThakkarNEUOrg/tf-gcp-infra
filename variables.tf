@@ -33,3 +33,5 @@ variable "gcga_purpose" {}
 variable "gcga_address_type" {}
 variable "sql_instance_disk_size" {}
 variable "sql_instance_deletion_protection_enabled" {}
+variable "sql_disk_autoresize" {}
+variable "random_password_length" {}
