@@ -156,16 +156,13 @@ resource "google_compute_instance" "default" {
     }
   }
 
-  metadata_startup_script = <<-SCRIPT
-#!/bin/bash
-# Export the database configuration as environment variables
-echo "MYSQL_HOSTNAME=${local.sql_private_ip[0]}" >>/opt/webapp/.env
-echo "MYSQL_PASSWORD=${random_password.password.result}" >>/opt/webapp/.env
-echo "MYSQL_DATABASENAME=${google_sql_database.webapp-sql.name}" >>/opt/webapp/.env
-echo "MYSQL_USERNAME=${google_sql_user.webapp.name}" >>/opt/webapp/.env
-echo "PORT=${var.database_port}" >>/opt/webapp/.env
-echo "SALT_ROUNDS=${var.salt_rounds}" >>/opt/webapp/.env
-touch /opt/finish.txt
-SCRIPT
+  metadata_startup_script = templatefile("${path.module}/startup.sh", {
+    sql_hostname     = local.sql_private_ip[0],
+    sql_password     = random_password.password.result,
+    sql_databasename = google_sql_database.webapp-sql.name,
+    sql_username     = google_sql_user.webapp.name,
+    sql_port         = var.database_port,
+    salt_rounds      = var.salt_rounds
+  })
 }
 # [End]
