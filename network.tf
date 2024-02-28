@@ -74,7 +74,7 @@ resource "google_sql_database_instance" "sql-primary" {
 
   settings {
     tier                        = var.sql_db_instance_tier
-    deletion_protection_enabled = false
+    deletion_protection_enabled = var.sql_instance_deletion_protection_enabled
 
     backup_configuration {
       enabled            = true
@@ -86,7 +86,7 @@ resource "google_sql_database_instance" "sql-primary" {
       private_network = google_service_networking_connection.private_vpc_connection.network
     }
 
-    disk_autoresize = true
+    disk_autoresize = var.sql_disk_autoresize
     disk_size       = var.sql_instance_disk_size
     disk_type       = var.sql_db_instance_disk_type
 
@@ -105,7 +105,7 @@ resource "google_sql_database" "webapp-sql" {
 
 # [Start google_sql_user]
 resource "random_password" "password" {
-  length  = 16
+  length  = var.random_password_length
   special = true
 }
 
