@@ -67,10 +67,11 @@ resource "google_compute_firewall" "firewall_deny_rules" {
 
 # [Start google_sql_database_instance sql-primary]
 resource "google_sql_database_instance" "sql-primary" {
-  name             = var.sql_database_instance_name
-  database_version = "MYSQL_8_0"
-  region           = var.sql_db_instance_region
-  depends_on       = [google_service_networking_connection.private_vpc_connection]
+  name                = var.sql_database_instance_name
+  database_version    = "MYSQL_8_0"
+  region              = var.sql_db_instance_region
+  depends_on          = [google_service_networking_connection.private_vpc_connection]
+  deletion_protection = var.sql_deletion_protection
 
   settings {
     tier                        = var.sql_db_instance_tier
@@ -141,6 +142,7 @@ resource "google_compute_instance" "default" {
   machine_type = var.machine_type
   zone         = var.vm_instance_zone
   tags         = [var.subnet1_name]
+  depends_on   = [google_service_account.ops_agent_service_account, google_project_iam_binding.logging_admin, google_project_iam_binding.monitoring_metric_writer]
   boot_disk {
     initialize_params {
       image = var.image_name
@@ -156,6 +158,11 @@ resource "google_compute_instance" "default" {
     }
   }
 
+  service_account {
+    email  = google_service_account.ops_agent_service_account.email
+    scopes = var.service_account_scopes
+  }
+
   metadata_startup_script = templatefile("${path.module}/startup.sh", {
     sql_hostname     = local.sql_private_ip[0],
     sql_password     = random_password.password.result,
@@ -166,3 +173,45 @@ resource "google_compute_instance" "default" {
   })
 }
 # [End]
+
+# [Start] DNS connection to VM
+resource "google_dns_record_set" "a-record" {
+  name         = var.domain_name
+  type         = "A"
+  ttl          = var.ttl
+  managed_zone = var.managed_zone_dns
+  rrdatas      = [google_compute_instance.default.network_interface.0.access_config.0.nat_ip]
+}
+# [End] DNS connection to VM
+
+# # [Start] Service Account
+resource "google_service_account" "ops_agent_service_account" {
+  account_id   = "ops-agent"
+  display_name = "Ops Agent"
+  description  = "Service account for Google Ops Agent"
+}
+# # [End] Service Account
+
+# # [Start] IAM policy
+resource "google_project_iam_binding" "logging_admin" {
+  project    = var.project_id
+  role       = "roles/logging.admin"
+  depends_on = [google_service_account.ops_agent_service_account]
+
+  members = [
+    "serviceAccount:${google_service_account.ops_agent_service_account.email}"
+  ]
+}
+
+resource "google_project_iam_binding" "monitoring_metric_writer" {
+  project    = var.project_id
+  role       = "roles/monitoring.metricWriter"
+  depends_on = [google_service_account.ops_agent_service_account]
+
+  members = [
+    "serviceAccount:${google_service_account.ops_agent_service_account.email}"
+  ]
+}
+# # [End] Service Account Binding
+
+
