@@ -33,5 +33,10 @@ variable "gcga_purpose" {}
 variable "gcga_address_type" {}
 variable "sql_instance_disk_size" {}
 variable "sql_instance_deletion_protection_enabled" {}
+variable "sql_deletion_protection" {}
 variable "sql_disk_autoresize" {}
 variable "random_password_length" {}
+variable "domain_name" {}
+variable "ttl" {}
+variable "managed_zone_dns" {}
+variable "service_account_scopes" {}
