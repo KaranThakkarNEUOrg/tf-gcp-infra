@@ -186,16 +186,16 @@ resource "google_dns_record_set" "a-record" {
 
 # # [Start] Service Account
 resource "google_service_account" "ops_agent_service_account" {
-  account_id   = "ops-agent"
-  display_name = "Ops Agent"
-  description  = "Service account for Google Ops Agent"
+  account_id   = var.ops_agent_account_id
+  display_name = var.ops_agent_display_name
+  description  = var.ops_agent_description
 }
 # # [End] Service Account
 
 # # [Start] IAM policy
 resource "google_project_iam_binding" "logging_admin" {
   project    = var.project_id
-  role       = "roles/logging.admin"
+  role       = var.iam_logging_admin_role
   depends_on = [google_service_account.ops_agent_service_account]
 
   members = [
@@ -205,7 +205,7 @@ resource "google_project_iam_binding" "logging_admin" {
 
 resource "google_project_iam_binding" "monitoring_metric_writer" {
   project    = var.project_id
-  role       = "roles/monitoring.metricWriter"
+  role       = var.iam_monitoring_role
   depends_on = [google_service_account.ops_agent_service_account]
 
   members = [

@@ -40,3 +40,8 @@ variable "domain_name" {}
 variable "ttl" {}
 variable "managed_zone_dns" {}
 variable "service_account_scopes" {}
+variable "ops_agent_account_id" {}
+variable "ops_agent_display_name" {}
+variable "ops_agent_description" {}
+variable "iam_logging_admin_role" {}
+variable "iam_monitoring_role" {}
