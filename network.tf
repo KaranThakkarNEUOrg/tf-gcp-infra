@@ -54,7 +54,7 @@ resource "google_compute_firewall" "firewall_allow_rules" {
 resource "google_compute_firewall" "firewall_deny_rules" {
   name    = "firewall-deny-rules"
   network = google_compute_network.vpc.name
-  deny {
+  allow {
     protocol = "tcp"
     ports    = var.firewall_deny_ports
   }
@@ -107,7 +107,7 @@ resource "google_sql_database" "webapp-sql" {
 # [Start google_sql_user]
 resource "random_password" "password" {
   length  = var.random_password_length
-  special = true
+  special = false
 }
 
 resource "google_sql_user" "webapp" {
@@ -212,6 +212,143 @@ resource "google_project_iam_binding" "monitoring_metric_writer" {
     "serviceAccount:${google_service_account.ops_agent_service_account.email}"
   ]
 }
-# # [End] Service Account Binding
+# [End] Service Account Binding
+
+# [Start] Creating Pub/Sub topic
+resource "google_pubsub_topic" "verify_email" {
+  name                       = var.pubsub_topic_name
+  message_retention_duration = "604800s" # 7 days
+}
+# [End] Creating Pub/Sub topic
+
+# [Start] Creating service account for pub/sub
+resource "google_service_account" "pubsub_service_account" {
+  account_id   = var.pubsub_service_account_id
+  display_name = var.pubsub_service_account_display_name
+  depends_on   = [google_pubsub_topic.verify_email]
+}
+# [End] Creating service account for pub/sub
+
+# [Start] Binding pub/sub service account
+resource "google_project_iam_binding" "pubsub_service_account_publisher_binding" {
+  project    = var.project_id
+  role       = var.pubsub_service_account_publisher_role
+  depends_on = [google_service_account.pubsub_service_account]
+
+  members = [
+    "serviceAccount:${google_service_account.pubsub_service_account.email}"
+  ]
+}
+
+resource "google_project_iam_binding" "pubsub_service_account_invoker_binding" {
+  project    = var.project_id
+  role       = "roles/run.invoker"
+  depends_on = [google_service_account.pubsub_service_account]
+
+  members = [
+    "serviceAccount:${google_service_account.pubsub_service_account.email}"
+  ]
+}
+# [End] Binding pub/sub service account
+resource "google_cloudfunctions2_function" "verify_email" {
+  name        = var.cloud_function_name
+  location    = var.cloud_function_region
+  description = var.cloud_function_description
+
+  build_config {
+    runtime     = var.cloud_function_runtime
+    entry_point = var.cloud_function_entry_point
+    source {
+      storage_source {
+        bucket = "webapp-cloud-function"
+        object = "cloud_function.zip"
+      }
+    }
+  }
+
+  service_config {
+    max_instance_count    = 1
+    min_instance_count    = 1
+    available_cpu         = "1"
+    available_memory      = var.cloud_function_available_memory_mb
+    timeout_seconds       = var.cloud_function_timeout
+    service_account_email = google_service_account.pubsub_service_account.email
+    vpc_connector         = google_vpc_access_connector.cf_vpc_connector.self_link
+
+    environment_variables = {
+      MAILGUN_API_KEY  = var.MAILGUN_API_KEY
+      WEBAPP_URL       = var.WEBAPP_URL
+      sql_hostname     = local.sql_private_ip[0],
+      sql_password     = random_password.password.result,
+      sql_databasename = google_sql_database.webapp-sql.name,
+      sql_username     = google_sql_user.webapp.name,
+    }
+
+  }
+
+  event_trigger {
+    event_type            = "google.cloud.pubsub.topic.v1.messagePublished"
+    pubsub_topic          = google_pubsub_topic.verify_email.id
+    retry_policy          = "RETRY_POLICY_RETRY"
+    trigger_region        = "us-east1"
+    service_account_email = google_service_account.pubsub_service_account.email
+  }
+
+  depends_on = [google_pubsub_topic.verify_email]
+}
+# [End] Creating cloud function for pub/sub
+
+# [Start] creating subscription for cloud functions
+# resource "google_pubsub_subscription" "push_msg" {
+#   name                       = "push-webapp-msg"
+#   topic                      = google_pubsub_topic.verify_email.id
+#   message_retention_duration = "604800s" #7days
+#   retain_acked_messages      = false
+
+#   ack_deadline_seconds = 120
+#   push_config {
+#     push_endpoint = google_cloudfunctions2_function.verify_email.url
+#     oidc_token {
+#       service_account_email = google_service_account.pubsub_service_account.email
+#       audience              = google_cloudfunctions2_function.verify_email.url
+#     }
+#   }
+
+#   retry_policy {
+#     minimum_backoff = "10s"
+#     maximum_backoff = "600s"
+#   }
+
+#   enable_message_ordering = false
+# }
+
+resource "google_pubsub_subscription" "pull_msg" {
+  name                       = "pull-webapp-msg"
+  topic                      = google_pubsub_topic.verify_email.id
+  message_retention_duration = "604800s" #7days
+  retain_acked_messages      = false
+  ack_deadline_seconds       = 600
+
+  retry_policy {
+    minimum_backoff = "10s"
+    maximum_backoff = "600s"
+  }
+
+  enable_exactly_once_delivery = true
+  enable_message_ordering      = false
+}
+
+# [End] creating subscription for cloud functions
+
+# [Start] Create a Serverless VPC Access connector
+resource "google_vpc_access_connector" "cf_vpc_connector" {
+  name          = "cf-vpc-connection"
+  region        = "us-east1"
+  ip_cidr_range = "10.8.0.0/28"
+  network       = var.vpc_name
+  min_instances = 2
+  max_instances = 10
+}
+# [End] Create a Serverless VPC Access connector
 
 
