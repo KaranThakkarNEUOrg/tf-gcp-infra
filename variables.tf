@@ -45,6 +45,7 @@ variable "ops_agent_display_name" {}
 variable "ops_agent_description" {}
 variable "iam_logging_admin_role" {}
 variable "iam_monitoring_role" {}
+variable "iam_publishing_message" {}
 variable "pubsub_topic_name" {}
 variable "pubsub_service_account_publisher_role" {}
 variable "pubsub_service_account_invoker_role" {}
@@ -60,3 +61,27 @@ variable "cloud_function_available_memory_mb" {}
 variable "MAILGUN_API_KEY" {}
 variable "pubsub_subscription_name" {}
 variable "WEBAPP_URL" {}
+variable "vpc_connector_name" {}
+variable "vpc_connector_region" {}
+variable "vpc_ip_cidr_range" {}
+variable "vpc_connector_machine_type" {}
+variable "enable_exactly_once_delivery" {}
+variable "enable_message_ordering" {}
+variable "minimum_backoff" {}
+variable "maximum_backoff" {}
+variable "pubsub_pull_subscription_name" {}
+variable "message_retention_duration" {}
+variable "retain_acked_messages" {}
+variable "ack_deadline_seconds" {}
+variable "event_trigger_region" {}
+variable "event_trigger_retry_policy" {}
+variable "event_trigger_event_type" {}
+variable "storage_bucket_name" {}
+variable "storage_bucket_object_name" {}
+variable "pubsub_invoker_role" {}
+variable "pubsub_topic_message_retention" {}
+variable "mailgun_username" {}
+variable "metadata_table_name" {}
+variable "webapp_domain_name" {}
+variable "message_from" {}
+
