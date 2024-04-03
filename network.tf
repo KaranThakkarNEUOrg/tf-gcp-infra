@@ -77,6 +77,11 @@ resource "google_sql_database_instance" "sql-primary" {
     tier                        = var.sql_db_instance_tier
     deletion_protection_enabled = var.sql_instance_deletion_protection_enabled
 
+    database_flags {
+      name  = "max_connections"
+      value = "5000"
+    }
+
     backup_configuration {
       enabled            = true
       binary_log_enabled = true
