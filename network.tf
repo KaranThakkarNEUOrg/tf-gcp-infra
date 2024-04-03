@@ -54,7 +54,7 @@ resource "google_compute_firewall" "firewall_allow_rules" {
 resource "google_compute_firewall" "firewall_deny_rules" {
   name    = "firewall-deny-rules"
   network = google_compute_network.vpc.name
-  allow {
+  deny {
     protocol = "tcp"
     ports    = var.firewall_deny_ports
   }
@@ -239,7 +239,7 @@ resource "google_compute_global_forwarding_rule" "forwarding_rule" {
 resource "google_compute_target_https_proxy" "https_proxy" {
   name             = var.http_proxy_name
   url_map          = google_compute_url_map.url_map.id
-  ssl_certificates = [google_compute_ssl_certificate.ssl_certificate.id]
+  ssl_certificates = [google_compute_managed_ssl_certificate.ssl_certificate.id]
 }
 
 resource "google_compute_url_map" "url_map" {
@@ -259,12 +259,11 @@ resource "google_compute_backend_service" "backend_service" {
   }
 }
 
-resource "google_compute_ssl_certificate" "ssl_certificate" {
-  name        = var.ssl_cert_name
-  private_key = file("./private.key")
-  certificate = file("./certificate.crt")
-  lifecycle {
-    create_before_destroy = true
+resource "google_compute_managed_ssl_certificate" "ssl_certificate" {
+  name = "ssl-certificate"
+
+  managed {
+    domains = [var.main_domain_name]
   }
 }
 
