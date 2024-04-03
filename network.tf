@@ -47,14 +47,14 @@ resource "google_compute_firewall" "firewall_allow_rules" {
     ports    = var.firewall_allow_ports
   }
 
-  source_ranges = var.source_ranges
+  source_ranges = var.source_ranges_https
   target_tags   = [var.subnet1_name, var.subnet2_name]
 }
 
 resource "google_compute_firewall" "firewall_deny_rules" {
   name    = "firewall-deny-rules"
   network = google_compute_network.vpc.name
-  deny {
+  allow {
     protocol = "tcp"
     ports    = var.firewall_deny_ports
   }
@@ -137,19 +137,20 @@ resource "google_service_networking_connection" "private_vpc_connection" {
 
 # [Start]
 # [VM instances creation, assigning tags same as subnetwork]
-resource "google_compute_instance" "default" {
-  name                      = var.vm_instance_name
-  machine_type              = var.machine_type
-  zone                      = var.vm_instance_zone
-  tags                      = [var.subnet1_name]
-  depends_on                = [google_service_account.ops_agent_service_account, google_project_iam_binding.logging_admin, google_project_iam_binding.monitoring_metric_writer, google_project_iam_binding.ops_agent_publisher]
-  allow_stopping_for_update = true
-  boot_disk {
-    initialize_params {
-      image = var.image_name
-      size  = var.instance_size
-      type  = var.instance_type
-    }
+
+resource "google_compute_region_instance_template" "default" {
+  name         = var.vm_instance_name
+  machine_type = var.machine_type
+  region       = var.region
+  depends_on   = [google_service_account.ops_agent_service_account, google_project_iam_binding.logging_admin, google_project_iam_binding.monitoring_metric_writer, google_project_iam_binding.ops_agent_publisher]
+  tags         = [var.subnet1_name]
+
+  disk {
+    source_image = var.image_name
+    auto_delete  = true
+    boot         = true
+    disk_size_gb = var.instance_size
+    disk_type    = var.instance_type
   }
 
   network_interface {
@@ -172,17 +173,112 @@ resource "google_compute_instance" "default" {
     sql_port         = var.database_port,
     salt_rounds      = var.salt_rounds
   })
-}
-# [End]
 
-# [Start] DNS connection to VM
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+resource "google_compute_health_check" "health_check" {
+  name                = var.health_check_name
+  check_interval_sec  = var.check_interval_sec
+  timeout_sec         = var.timeout_sec
+  healthy_threshold   = var.healthy_threshold
+  unhealthy_threshold = var.unhealthy_threshold
+
+  http_health_check {
+    port         = 8080
+    request_path = "/healthz"
+  }
+}
+
+resource "google_compute_region_autoscaler" "autoscaler" {
+  name   = var.autoscaler_name
+  target = google_compute_region_instance_group_manager.instance_group_manager.id
+  region = var.region
+
+  autoscaling_policy {
+    max_replicas    = var.max_replicas
+    min_replicas    = var.min_replicas
+    cooldown_period = var.cooldown_period
+
+    cpu_utilization {
+      target = var.cpu_utilization
+    }
+  }
+
+  depends_on = [google_compute_region_instance_group_manager.instance_group_manager]
+}
+
+resource "google_compute_region_instance_group_manager" "instance_group_manager" {
+  name               = var.instance_group_manager_name
+  base_instance_name = "instance"
+  region             = var.region
+
+  version {
+    instance_template = google_compute_region_instance_template.default.id
+  }
+
+  named_port {
+    name = var.custom_port_name
+    port = 8080
+  }
+
+  auto_healing_policies {
+    health_check      = google_compute_health_check.health_check.id
+    initial_delay_sec = 300
+  }
+}
+
+resource "google_compute_global_forwarding_rule" "forwarding_rule" {
+  name       = var.forwarding_rule_name
+  target     = google_compute_target_https_proxy.https_proxy.id
+  port_range = "443"
+}
+
+resource "google_compute_target_https_proxy" "https_proxy" {
+  name             = var.http_proxy_name
+  url_map          = google_compute_url_map.url_map.id
+  ssl_certificates = [google_compute_ssl_certificate.ssl_certificate.id]
+}
+
+resource "google_compute_url_map" "url_map" {
+  name            = var.url_map_name
+  default_service = google_compute_backend_service.backend_service.id
+}
+
+resource "google_compute_backend_service" "backend_service" {
+  name                  = var.backend_service_name
+  port_name             = var.custom_port_name
+  protocol              = var.http_protocol
+  health_checks         = [google_compute_health_check.health_check.id]
+  load_balancing_scheme = var.load_balancing_scheme
+
+  backend {
+    group = google_compute_region_instance_group_manager.instance_group_manager.instance_group
+  }
+}
+
+resource "google_compute_ssl_certificate" "ssl_certificate" {
+  name        = var.ssl_cert_name
+  private_key = file("./private.key")
+  certificate = file("./certificate.crt")
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
 resource "google_dns_record_set" "a-record" {
   name         = var.domain_name
   type         = "A"
   ttl          = var.ttl
   managed_zone = var.managed_zone_dns
-  rrdatas      = [google_compute_instance.default.network_interface.0.access_config.0.nat_ip]
+  rrdatas      = [google_compute_global_forwarding_rule.forwarding_rule.ip_address]
+  depends_on   = [google_compute_global_forwarding_rule.forwarding_rule]
 }
+
+
+# [End]
 # [End] DNS connection to VM
 
 # # [Start] Service Account
@@ -223,6 +319,8 @@ resource "google_project_iam_binding" "ops_agent_publisher" {
     "serviceAccount:${google_service_account.pubsub_service_account.email}"
   ]
 }
+
+
 # [End] Service Account Binding
 
 # [Start] Creating Pub/Sub topic
@@ -241,16 +339,6 @@ resource "google_service_account" "pubsub_service_account" {
 # [End] Creating service account for pub/sub
 
 # [Start] Binding pub/sub service account
-# resource "google_project_iam_binding" "pubsub_service_account_publisher_binding" {
-#   project    = var.project_id
-#   role       = var.pubsub_service_account_publisher_role
-#   depends_on = [google_service_account.pubsub_service_account]
-
-#   members = [
-#     "serviceAccount:${google_service_account.pubsub_service_account.email}"
-#   ]
-# }
-
 resource "google_project_iam_binding" "pubsub_service_account_invoker_binding" {
   project    = var.project_id
   role       = var.pubsub_invoker_role
@@ -282,9 +370,6 @@ resource "google_cloudfunctions2_function" "verify_email" {
   }
 
   service_config {
-    max_instance_count    = 1
-    min_instance_count    = 1
-    available_cpu         = "1"
     available_memory      = var.cloud_function_available_memory_mb
     timeout_seconds       = var.cloud_function_timeout
     service_account_email = google_service_account.pubsub_service_account.email
@@ -372,5 +457,4 @@ resource "google_vpc_access_connector" "cf_vpc_connector" {
   depends_on    = [google_compute_network.vpc]
 }
 # [End] Create a Serverless VPC Access connector
-
 
