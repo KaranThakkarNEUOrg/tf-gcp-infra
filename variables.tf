@@ -84,4 +84,24 @@ variable "mailgun_username" {}
 variable "metadata_table_name" {}
 variable "webapp_domain_name" {}
 variable "message_from" {}
+variable "source_ranges_https" {}
+variable "ssl_cert_name" {}
+variable "backend_service_name" {}
+variable "custom_port_name" {}
+variable "http_protocol" {}
+variable "load_balancing_scheme" {}
+variable "url_map_name" {}
+variable "http_proxy_name" {}
+variable "forwarding_rule_name" {}
+variable "instance_group_manager_name" {}
+variable "autoscaler_name" {}
+variable "health_check_name" {}
+variable "check_interval_sec" {}
+variable "timeout_sec" {}
+variable "healthy_threshold" {}
+variable "unhealthy_threshold" {}
+variable "max_replicas" {}
+variable "min_replicas" {}
+variable "cooldown_period" {}
+variable "cpu_utilization" {}
 
