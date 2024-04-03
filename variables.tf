@@ -104,4 +104,5 @@ variable "max_replicas" {}
 variable "min_replicas" {}
 variable "cooldown_period" {}
 variable "cpu_utilization" {}
+variable "main_domain_name" {}
 
