@@ -72,6 +72,7 @@ resource "google_sql_database_instance" "sql-primary" {
   region              = var.sql_db_instance_region
   depends_on          = [google_service_networking_connection.private_vpc_connection]
   deletion_protection = var.sql_deletion_protection
+  encryption_key_name = google_kms_crypto_key.crypto_sign_key_sql.id
 
   settings {
     tier                        = var.sql_db_instance_tier
@@ -97,7 +98,6 @@ resource "google_sql_database_instance" "sql-primary" {
     disk_type       = var.sql_db_instance_disk_type
 
     availability_type = var.sql_db_instance_availability_type
-
   }
 }
 # [End google_sql_database_instance sql-primary]
@@ -152,10 +152,14 @@ resource "google_compute_region_instance_template" "default" {
 
   disk {
     source_image = var.image_name
-    auto_delete  = true
+    auto_delete  = false
     boot         = true
     disk_size_gb = var.instance_size
     disk_type    = var.instance_type
+
+    disk_encryption_key {
+      kms_key_self_link = google_kms_crypto_key.crypto_sign_key_vm.id
+    }
   }
 
   network_interface {
@@ -178,10 +182,6 @@ resource "google_compute_region_instance_template" "default" {
     sql_port         = var.database_port,
     salt_rounds      = var.salt_rounds
   })
-
-  lifecycle {
-    create_before_destroy = true
-  }
 }
 
 resource "google_compute_health_check" "health_check" {
@@ -324,7 +324,6 @@ resource "google_project_iam_binding" "ops_agent_publisher" {
   ]
 }
 
-
 # [End] Service Account Binding
 
 # [Start] Creating Pub/Sub topic
@@ -362,14 +361,14 @@ resource "google_cloudfunctions2_function" "verify_email" {
     runtime     = var.cloud_function_runtime
     entry_point = var.cloud_function_entry_point
     source {
-      repo_source {
-        repo_name   = "github_karanthakkarneuorg_serverless"
-        branch_name = "main"
-      }
-      # storage_source {
-      #   bucket = var.storage_bucket_name
-      #   object = var.storage_bucket_object_name
+      # repo_source {
+      #   repo_name   = "github_karanthakkarneuorg_serverless"
+      #   branch_name = "main"
       # }
+      storage_source {
+        bucket = google_storage_bucket.storage_bucket.name
+        object = google_storage_bucket_object.storage_bucket_object.name
+      }
     }
   }
 
@@ -405,33 +404,9 @@ resource "google_cloudfunctions2_function" "verify_email" {
     service_account_email = google_service_account.pubsub_service_account.email
   }
 
-  depends_on = [google_pubsub_topic.verify_email, google_service_account.pubsub_service_account]
+  depends_on = [google_pubsub_topic.verify_email, google_service_account.pubsub_service_account, google_storage_bucket.storage_bucket, google_storage_bucket_object.storage_bucket_object]
 }
 # [End] Creating cloud function for pub/sub
-
-# [Start] creating subscription for cloud functions
-# resource "google_pubsub_subscription" "push_msg" {
-#   name                       = "push-webapp-msg"
-#   topic                      = google_pubsub_topic.verify_email.id
-#   message_retention_duration = "604800s" #7days
-#   retain_acked_messages      = false
-
-#   ack_deadline_seconds = 120
-#   push_config {
-#     push_endpoint = google_cloudfunctions2_function.verify_email.url
-#     oidc_token {
-#       service_account_email = google_service_account.pubsub_service_account.email
-#       audience              = google_cloudfunctions2_function.verify_email.url
-#     }
-#   }
-
-#   retry_policy {
-#     minimum_backoff = "10s"
-#     maximum_backoff = "600s"
-#   }
-
-#   enable_message_ordering = false
-# }
 
 resource "google_pubsub_subscription" "pull_msg" {
   name                       = var.pubsub_pull_subscription_name
@@ -461,4 +436,141 @@ resource "google_vpc_access_connector" "cf_vpc_connector" {
   depends_on    = [google_compute_network.vpc]
 }
 # [End] Create a Serverless VPC Access connector
+
+
+# [Start] Creating storage bucket
+data "google_storage_project_service_account" "gcs_account" {
+}
+
+resource "google_kms_crypto_key_iam_binding" "crypto_key_bucket" {
+  crypto_key_id = google_kms_crypto_key.crypto_sign_key_bucket.id
+  role          = var.encrypter_decrypter_role_name
+
+  members = ["serviceAccount:${data.google_storage_project_service_account.gcs_account.email_address}"]
+}
+
+resource "google_kms_crypto_key_iam_binding" "crypto_key_object" {
+  crypto_key_id = google_kms_crypto_key.crypto_sign_key_bucket_object.id
+  role          = var.encrypter_decrypter_role_name
+
+  members = ["serviceAccount:${data.google_storage_project_service_account.gcs_account.email_address}"]
+}
+
+resource "google_kms_crypto_key_iam_binding" "crypto_key_vm" {
+  crypto_key_id = google_kms_crypto_key.crypto_sign_key_vm.id
+  role          = var.encrypter_decrypter_role_name
+
+  members = [
+    "serviceAccount:${var.default_service_account}",
+  ]
+}
+
+
+resource "google_storage_bucket" "storage_bucket" {
+  name                        = var.storage_bucket_name
+  location                    = var.region
+  storage_class               = "STANDARD"
+  force_destroy               = true
+  uniform_bucket_level_access = true
+  encryption {
+    default_kms_key_name = google_kms_crypto_key.crypto_sign_key_bucket.id
+  }
+
+  depends_on = [google_kms_crypto_key_iam_binding.crypto_key_bucket]
+
+}
+
+resource "google_storage_bucket_object" "storage_bucket_object" {
+  name         = var.storage_bucket_object_name
+  bucket       = google_storage_bucket.storage_bucket.name
+  source       = "./cloud_function.zip"
+  kms_key_name = google_kms_crypto_key.crypto_sign_key_bucket_object.id
+}
+# [End] Creating storage bucket
+
+# [Start] Creating Project service account
+resource "google_project_service_identity" "gcp_sa_cloud_sql" {
+  project  = var.project_id
+  provider = google-beta
+  service  = var.sql_googleapi_service
+}
+# [End] Creating Project service account
+
+resource "google_kms_crypto_key_iam_binding" "crypto_key_sql" {
+  provider      = google-beta
+  crypto_key_id = google_kms_crypto_key.crypto_sign_key_sql.id
+  role          = var.encrypter_decrypter_role_name
+
+  members = [
+    "serviceAccount:${google_project_service_identity.gcp_sa_cloud_sql.email}",
+  ]
+}
+
+
+# # [Start] Creating KMS keyring and key
+resource "google_kms_key_ring" "key_ring" {
+  name     = var.kms_key_name
+  location = var.region
+}
+
+resource "google_kms_crypto_key" "crypto_sign_key_bucket_object" {
+  name     = var.crypto_sign_key_bucket_object_name
+  key_ring = google_kms_key_ring.key_ring.id
+  purpose  = var.crypto_purpose
+
+  version_template {
+    algorithm = var.crypto_algorithm
+  }
+  lifecycle {
+    prevent_destroy = false
+  }
+
+  rotation_period = var.rotation_period
+}
+
+resource "google_kms_crypto_key" "crypto_sign_key_vm" {
+  name     = var.crypto_sign_key_vm_name
+  key_ring = google_kms_key_ring.key_ring.id
+  purpose  = var.crypto_purpose
+
+  version_template {
+    algorithm = var.crypto_algorithm
+  }
+  lifecycle {
+    prevent_destroy = false
+  }
+
+  rotation_period = var.rotation_period
+}
+
+resource "google_kms_crypto_key" "crypto_sign_key_bucket" {
+  name     = var.crypto_sign_key_bucket_name
+  key_ring = google_kms_key_ring.key_ring.id
+  purpose  = var.crypto_purpose
+
+  version_template {
+    algorithm = var.crypto_algorithm
+  }
+  lifecycle {
+    prevent_destroy = false
+  }
+
+  rotation_period = var.rotation_period
+}
+
+resource "google_kms_crypto_key" "crypto_sign_key_sql" {
+  name     = var.crypto_sign_key_sql_name
+  key_ring = google_kms_key_ring.key_ring.id
+  purpose  = var.crypto_purpose
+
+  version_template {
+    algorithm = var.crypto_algorithm
+  }
+  lifecycle {
+    prevent_destroy = false
+  }
+
+  rotation_period = var.rotation_period
+}
+# [End] Creating KMS keyring and key
 

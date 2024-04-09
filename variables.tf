@@ -105,4 +105,14 @@ variable "min_replicas" {}
 variable "cooldown_period" {}
 variable "cpu_utilization" {}
 variable "main_domain_name" {}
-
+variable "encrypter_decrypter_role_name" {}
+variable "kms_key_name" {}
+variable "crypto_sign_key_bucket_object_name" {}
+variable "crypto_sign_key_vm_name" {}
+variable "crypto_sign_key_bucket_name" {}
+variable "crypto_sign_key_sql_name" {}
+variable "crypto_purpose" {}
+variable "crypto_algorithm" {}
+variable "rotation_period" {}
+variable "sql_googleapi_service" {}
+variable "default_service_account" {}
