@@ -235,11 +235,11 @@ resource "google_compute_region_instance_group_manager" "instance_group_manager"
   }
 
   update_policy {
-    type                  = "PROACTIVE"
-    minimal_action        = "REPLACE"
-    max_surge_fixed       = 3
-    max_unavailable_fixed = 0
-    replacement_method    = "SUBSTITUTE"
+    type                  = var.update_policy
+    minimal_action        = var.update_polic_minimal_action
+    max_surge_fixed       = var.update_policy_max_surge_fixed
+    max_unavailable_fixed = var.update_policy_max_unavailable_fixed
+    replacement_method    = var.update_policy_replacement_method
   }
 
 }
