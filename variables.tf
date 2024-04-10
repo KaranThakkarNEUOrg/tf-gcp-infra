@@ -124,3 +124,8 @@ variable "secret_manager_sql_host_name" {}
 variable "secret_manager_sql_database_name" {}
 variable "secret_manager_sql_user_name" {}
 variable "secret_manager_vm_name" {}
+variable "update_policy" {}
+variable "update_polic_minimal_action" {}
+variable "update_policy_replacement_method" {}
+variable "update_policy_max_surge_fixed" {}
+variable "update_policy_max_unavailable_fixed" {}
