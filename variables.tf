@@ -116,3 +116,11 @@ variable "crypto_algorithm" {}
 variable "rotation_period" {}
 variable "sql_googleapi_service" {}
 variable "default_service_account" {}
+variable "packer_service_account" {}
+variable "secret_manager_role" {}
+variable "secret_manager_health_check_role" {}
+variable "secret_manager_sql_password_name" {}
+variable "secret_manager_sql_host_name" {}
+variable "secret_manager_sql_database_name" {}
+variable "secret_manager_sql_user_name" {}
+variable "secret_manager_vm_name" {}

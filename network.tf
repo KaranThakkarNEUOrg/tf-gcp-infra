@@ -233,6 +233,15 @@ resource "google_compute_region_instance_group_manager" "instance_group_manager"
     health_check      = google_compute_health_check.health_check.id
     initial_delay_sec = 300
   }
+
+  update_policy {
+    type                  = "PROACTIVE"
+    minimal_action        = "REPLACE"
+    max_surge_fixed       = 3
+    max_unavailable_fixed = 0
+    replacement_method    = "SUBSTITUTE"
+  }
+
 }
 
 resource "google_compute_global_forwarding_rule" "forwarding_rule" {
@@ -382,15 +391,15 @@ resource "google_cloudfunctions2_function" "verify_email" {
     environment_variables = {
       MAILGUN_API_KEY     = var.MAILGUN_API_KEY
       WEBAPP_URL          = var.WEBAPP_URL
-      sql_hostname        = local.sql_private_ip[0],
-      sql_password        = random_password.password.result,
-      sql_databasename    = google_sql_database.webapp-sql.name,
-      sql_username        = google_sql_user.webapp.name,
-      mailgun_username    = var.mailgun_username,
-      pubsub_topic_name   = var.pubsub_topic_name,
-      webapp_domain_name  = var.webapp_domain_name,
-      metadata_table_name = var.metadata_table_name,
-      message_from        = var.message_from
+      SQL_HOSTNAME        = local.sql_private_ip[0],
+      SQL_PASSWORD        = random_password.password.result,
+      SQL_DATABASENAME    = google_sql_database.webapp-sql.name,
+      SQL_USERNAME        = google_sql_user.webapp.name,
+      MAILGUN_USERNAME    = var.mailgun_username,
+      PUBSUB_TOPIC_NAME   = var.pubsub_topic_name,
+      WEBAPP_DOMAIN_NAME  = var.webapp_domain_name,
+      METADATA_TABLE_NAME = var.metadata_table_name,
+      MESSAGE_FROM        = var.message_from
 
     }
 
@@ -573,4 +582,106 @@ resource "google_kms_crypto_key" "crypto_sign_key_sql" {
   rotation_period = var.rotation_period
 }
 # [End] Creating KMS keyring and key
+
+# [Start] Creating secret manger
+resource "google_secret_manager_secret" "secret_manager_sql_password" {
+  secret_id = var.secret_manager_sql_password_name
+  replication {
+    user_managed {
+      replicas {
+        location = var.region
+      }
+    }
+  }
+}
+
+resource "google_secret_manager_secret_version" "secret_manager_version_sql_password" {
+  secret      = google_secret_manager_secret.secret_manager_sql_password.name
+  secret_data = random_password.password.result
+}
+
+resource "google_secret_manager_secret" "secret_manager_sql_host" {
+  secret_id = var.secret_manager_sql_host_name
+  replication {
+    user_managed {
+      replicas {
+        location = var.region
+      }
+    }
+  }
+}
+
+resource "google_secret_manager_secret_version" "secret_manager_version_sql_host" {
+  secret      = google_secret_manager_secret.secret_manager_sql_host.name
+  secret_data = local.sql_private_ip[0]
+}
+
+resource "google_secret_manager_secret" "secret_manager_sql_database" {
+  secret_id = var.secret_manager_sql_database_name
+  replication {
+    user_managed {
+      replicas {
+        location = var.region
+      }
+    }
+  }
+}
+
+resource "google_secret_manager_secret_version" "secret_manager_version_sql_database" {
+  secret      = google_secret_manager_secret.secret_manager_sql_database.name
+  secret_data = var.sql_db_name
+}
+
+resource "google_secret_manager_secret" "secret_manager_sql_user" {
+  secret_id = var.secret_manager_sql_user_name
+  replication {
+    user_managed {
+      replicas {
+        location = var.region
+      }
+    }
+  }
+}
+
+resource "google_secret_manager_secret_version" "secret_manager_version_sql_user" {
+  secret      = google_secret_manager_secret.secret_manager_sql_user.name
+  secret_data = var.sql_user_name
+}
+
+resource "google_secret_manager_secret" "secret_manager_crypto_key_vm" {
+  secret_id = var.secret_manager_vm_name
+  replication {
+    user_managed {
+      replicas {
+        location = var.region
+      }
+    }
+  }
+}
+
+resource "google_secret_manager_secret_version" "secret_manager_version_crypto_key_vm" {
+  secret      = google_secret_manager_secret.secret_manager_crypto_key_vm.name
+  secret_data = google_kms_crypto_key.crypto_sign_key_vm.id
+}
+
+resource "google_project_iam_binding" "secret_manager" {
+  project    = var.project_id
+  role       = var.secret_manager_role
+  depends_on = [google_secret_manager_secret.secret_manager_sql_password, google_secret_manager_secret.secret_manager_sql_host, google_secret_manager_secret.secret_manager_crypto_key_vm, google_secret_manager_secret.secret_manager_sql_database, google_secret_manager_secret.secret_manager_sql_user]
+
+  members = [
+    "serviceAccount:${var.packer_service_account}"
+  ]
+}
+resource "google_project_iam_binding" "secret_manager_health_check" {
+  project = var.project_id
+  role    = var.secret_manager_health_check_role
+
+  members = [
+    "serviceAccount:${var.packer_service_account}"
+  ]
+}
+# [End] Creating secret manger
+
+
 
